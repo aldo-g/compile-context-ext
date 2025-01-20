@@ -1,71 +1,59 @@
-# context-gen-ext README
+# Context Generator
 
-This is the README for your extension "context-gen-ext". After writing up a brief description, we recommend including the following sections.
+Generate file tree and file contents for coding assistance with LLMs within VSCode.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Interactive File Tree:** Browse your project's file structure with checkboxes to include or exclude specific files and directories.
+- **Generate Context File:** Create a comprehensive context file (`file_context.txt`) based on your selections, useful for large language models (LLMs).
+- **Configuration Options:** Customize exclusions and output file name via VSCode settings.
 
-For example if there is an image subfolder under your extension project workspace:
+## Usage
 
-\!\[feature X\]\(images/feature-x.png\)
+1. **Open Your Project:**
+   - Open the folder you want to generate context for in VSCode.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+2. **Access Context Generator:**
+   - Navigate to the **"Context Generator"** view in the Explorer pane.
 
-## Requirements
+3. **Select Files and Directories:**
+   - Use the checkboxes to include or exclude specific files and directories.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+4. **Generate Context:**
+   - Click the **"Generate Context"** button in the view's title bar.
+   - A `file_context.txt` will be generated in the workspace root, containing the file tree and file contents.
 
-## Extension Settings
+## Configuration
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+Access the extension's settings to customize its behavior:
 
-For example:
+- **Exclude Files:**
+  - List of filenames to exclude from the context.
+  
+- **Exclude Paths:**
+  - List of directory paths to exclude from the context.
+  
+- **Output File:**
+  - Name of the output context file.
+  
+- **Exclude Hidden:**
+  - Toggle to include or exclude hidden files and directories.
 
-This extension contributes the following settings:
+## Installation
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+Install the extension from the [VSCode Marketplace](https://marketplace.visualstudio.com/vscode) or via the `.vsix` file.
 
-## Known Issues
+## Development
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+### Prerequisites
 
-## Release Notes
+- **Node.js** (v14 or later)
+- **npm** (v6 or later)
+- **Visual Studio Code**
 
-Users appreciate release notes as you update your extension.
+### Setup
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/aldo-g/context-gen-ext.git
+   cd context-gen-extnpm install

@@ -2,21 +2,23 @@
     "compilerOptions": {
         "module": "commonjs",
         "target": "es6",
-        "outDir": "out",
+        "outDir": "out/test",
         "lib": [
             "es6"
         ],
         "sourceMap": true,
-        "rootDir": "src",
+        "rootDir": ".",
         "strict": true,
         "noImplicitAny": false,
         "moduleResolution": "node",
         "esModuleInterop": true,
         "skipLibCheck": true
     },
+    "include": [
+        "test/**/*.ts"
+    ],
     "exclude": [
         "node_modules",
-        ".vscode-test",
-        "test"
+        ".vscode-test"
     ]
 }

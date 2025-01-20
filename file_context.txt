@@ -1,54 +1,635 @@
 File Tree:
+├── CHANGELOG.md
+├── eslint.config.mjs
+├── package.json
 ├── src/
 │   ├── extension.ts
-│   └── test/
-│       └── extension.test.ts
+│   ├── generateContext.ts
+│   ├── models/
+│   │   └── FileNode.ts
+│   └── treeDataProvider.ts
+├── test/
+│   ├── extension.test.js
+│   ├── extension.test.js.map
+│   └── extension.test.ts
+├── tsconfig.json
+├── tsconfig.test.json 
+└── vsc-extension-quickstart.md
 
 Files:
 
---- Start of src/extension.ts ---
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+--- Start of CHANGELOG.md ---
+# Change Log
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+All notable changes to the "context-gen-ext" extension will be documented in this file.
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "context-gen-ext" is now active!');
+Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('context-gen-ext.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from context-gen-ext!');
-	});
+## [Unreleased]
 
-	context.subscriptions.push(disposable);
+- Initial release
+
+--- Start of eslint.config.mjs ---
+import typescriptEslint from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
+
+export default [{
+    files: ["**/*.ts"],
+}, {
+    plugins: {
+        "@typescript-eslint": typescriptEslint,
+    },
+
+    languageOptions: {
+        parser: tsParser,
+        ecmaVersion: 2022,
+        sourceType: "module",
+    },
+
+    rules: {
+        "@typescript-eslint/naming-convention": ["warn", {
+            selector: "import",
+            format: ["camelCase", "PascalCase"],
+        }],
+
+        curly: "warn",
+        eqeqeq: "warn",
+        "no-throw-literal": "warn",
+        semi: "warn",
+    },
+}];
+
+--- Start of package.json ---
+{
+  "name": "context-gen-ext",
+  "displayName": "Context Generator",
+  "description": "Generate file tree and file contents for coding assistance with LLMs within VSCode.",
+  "version": "0.1.0",
+  "publisher": "aldo-g",
+  "engines": {
+      "vscode": "^1.60.0"
+  },
+  "categories": [
+      "Other"
+  ],
+  "activationEvents": [
+      "onView:contextGeneratorView",
+      "onCommand:contextGenerator.toggleCheckbox",
+      "onCommand:contextGenerator.generateContext"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+      "commands": [
+          {
+              "command": "contextGenerator.toggleCheckbox",
+              "title": "Toggle Checkbox"
+          },
+          {
+              "command": "contextGenerator.generateContext",
+              "title": "Generate Context",
+              "category": "Context Generator"
+          }
+      ],
+      "views": {
+          "explorer": [
+              {
+                  "id": "contextGeneratorView",
+                  "name": "Context Generator"
+              }
+          ]
+      },
+      "menus": {
+          "view/title": [
+              {
+                  "command": "contextGenerator.generateContext",
+                  "when": "view == contextGeneratorView",
+                  "group": "navigation"
+              }
+          ],
+          "view/item/context": [
+              {
+                  "command": "contextGenerator.toggleCheckbox",
+                  "when": "view == contextGeneratorView",
+                  "group": "navigation"
+              }
+          ]
+      },
+      "configuration": {
+          "type": "object",
+          "title": "Context Generator Configuration",
+          "properties": {
+              "contextGenerator.excludeFiles": {
+                  "type": "array",
+                  "items": {
+                      "type": "string"
+                  },
+                  "default": [".env", "package-lock.json", "LICENSE"],
+                  "description": "List of filenames to exclude."
+              },
+              "contextGenerator.excludePaths": {
+                  "type": "array",
+                  "items": {
+                      "type": "string"
+                  },
+                  "default": [".git", "__pycache__", "build"],
+                  "description": "List of directory paths to exclude."
+              },
+              "contextGenerator.outputFile": {
+                  "type": "string",
+                  "default": "file_context.txt",
+                  "description": "Output file for the generated context."
+              },
+              "contextGenerator.excludeHidden": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Exclude hidden files and directories."
+              }
+          }
+      }
+  },
+  "scripts": {
+      "vscode:prepublish": "npm run compile",
+      "compile": "tsc -p ./",
+      "compile:test": "tsc -p tsconfig.test.json",
+      "watch": "tsc -watch -p ./",
+      "watch:test": "tsc -watch -p tsconfig.test.json",
+      "pretest": "npm run compile && npm run compile:test",
+      "test": "mocha --require ts-node/register out/test/**/*.test.js"
+},
+  "devDependencies": {
+      "@types/glob": "^7.1.3",
+      "@types/mocha": "^9.0.0",
+      "@types/node": "^16.0.0",
+      "@types/vscode": "^1.60.0",
+      "eslint": "^7.32.0",
+      "glob": "^7.1.7",
+      "mocha": "^9.0.0",
+      "ts-node": "^10.4.0",
+      "typescript": "^4.4.3",
+      "vscode-test": "^1.6.0",
+      "vsce": "^2.3.0"
+  }
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+--- Start of tsconfig.json ---
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es6",
+        "outDir": "out",
+        "lib": [
+            "es6"
+        ],
+        "sourceMap": true,
+        "rootDir": "src",
+        "strict": true,
+        "noImplicitAny": false,
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "skipLibCheck": true
+    },
+    "exclude": [
+        "node_modules",
+        ".vscode-test",
+        "test"  // Exclude the test directory
+    ]
+}
+
+--- Start of tsconfig.test.json  ---
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es6",
+        "outDir": "out/test",
+        "lib": [
+            "es6"
+        ],
+        "sourceMap": true,
+        "rootDir": "test",
+        "strict": true,
+        "noImplicitAny": false,
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "skipLibCheck": true
+    },
+    "include": [
+        "test/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        ".vscode-test"
+    ]
+}
+
+--- Start of vsc-extension-quickstart.md ---
+# Welcome to your VS Code Extension
+
+## What's in the folder
+
+* This folder contains all of the files necessary for your extension.
+* `package.json` - this is the manifest file in which you declare your extension and command.
+  * The sample plugin registers a command and defines its title and command name. With this information VS Code can show the command in the command palette. It doesn’t yet need to load the plugin.
+* `src/extension.ts` - this is the main file where you will provide the implementation of your command.
+  * The file exports one function, `activate`, which is called the very first time your extension is activated (in this case by executing the command). Inside the `activate` function we call `registerCommand`.
+  * We pass the function containing the implementation of the command as the second parameter to `registerCommand`.
+
+## Get up and running straight away
+
+* Press `F5` to open a new window with your extension loaded.
+* Run your command from the command palette by pressing (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac) and typing `Hello World`.
+* Set breakpoints in your code inside `src/extension.ts` to debug your extension.
+* Find output from your extension in the debug console.
+
+## Make changes
+
+* You can relaunch the extension from the debug toolbar after changing code in `src/extension.ts`.
+* You can also reload (`Ctrl+R` or `Cmd+R` on Mac) the VS Code window with your extension to load your changes.
+
+## Explore the API
+
+* You can open the full set of our API when you open the file `node_modules/@types/vscode/index.d.ts`.
+
+## Run tests
+
+* Install the [Extension Test Runner](https://marketplace.visualstudio.com/items?itemName=ms-vscode.extension-test-runner)
+* Run the "watch" task via the **Tasks: Run Task** command. Make sure this is running, or tests might not be discovered.
+* Open the Testing view from the activity bar and click the Run Test" button, or use the hotkey `Ctrl/Cmd + ; A`
+* See the output of the test result in the Test Results view.
+* Make changes to `src/test/extension.test.ts` or create new test files inside the `test` folder.
+  * The provided test runner will only consider files matching the name pattern `**.test.ts`.
+  * You can create folders inside the `test` folder to structure your tests any way you want.
+
+## Go further
+
+* [Follow UX guidelines](https://code.visualstudio.com/api/ux-guidelines/overview) to create extensions that seamlessly integrate with VS Code's native interface and patterns.
+* Reduce the extension size and improve the startup time by [bundling your extension](https://code.visualstudio.com/api/working-with-extensions/bundling-extension).
+* [Publish your extension](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) on the VS Code extension marketplace.
+* Automate builds by setting up [Continuous Integration](https://code.visualstudio.com/api/working-with-extensions/continuous-integration).
+* Integrate to the [report issue](https://code.visualstudio.com/api/get-started/wrapping-up#issue-reporting) flow to get issue and feature requests reported by users.
 
 
---- Start of src/test/extension.test.ts ---
+--- Start of test/extension.test.js ---
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+// test/extension.test.ts
+const assert = __importStar(require("assert"));
+const vscode = __importStar(require("vscode"));
+const path = __importStar(require("path"));
+const generateContext_1 = require("../src/generateContext");
+const fs = __importStar(require("fs"));
+suite('Extension Test Suite', () => {
+    vscode.window.showInformationMessage('Start all tests.');
+    test('Generate Context Function', () => {
+        const workspaceRoot = path.resolve(__dirname, 'testWorkspace');
+        const outputFile = 'test_context.txt';
+        // Setup: Create a mock workspace
+        fs.mkdirSync(workspaceRoot, { recursive: true });
+        fs.writeFileSync(path.join(workspaceRoot, 'testFile.js'), 'console.log("Hello World");');
+        fs.writeFileSync(path.join(workspaceRoot, '__init__.py'), '');
+        const selectedFiles = [
+            {
+                label: 'testFile.js',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(path.join(workspaceRoot, 'testFile.js')),
+                checked: true
+            },
+            {
+                label: '__init__.py',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(path.join(workspaceRoot, '__init__.py')),
+                checked: true
+            }
+        ];
+        // Execute
+        (0, generateContext_1.generateContext)(workspaceRoot, outputFile, selectedFiles, [], [], false);
+        // Verify
+        const outputPath = path.join(workspaceRoot, outputFile);
+        assert.ok(fs.existsSync(outputPath), 'Output file was not created.');
+        const content = fs.readFileSync(outputPath, 'utf-8');
+        assert.ok(content.includes('File Tree:'), 'File Tree section missing.');
+        assert.ok(content.includes('Files:'), 'Files section missing.');
+        assert.ok(content.includes('testFile.js'), 'File entry missing.');
+        assert.ok(content.includes('__init__.py'), '__init__.py entry missing.');
+        // Cleanup
+        fs.unlinkSync(path.join(workspaceRoot, 'testFile.js'));
+        fs.unlinkSync(path.join(workspaceRoot, '__init__.py'));
+        fs.unlinkSync(outputPath);
+        fs.rmdirSync(workspaceRoot);
+    });
+});
+//# sourceMappingURL=extension.test.js.map
+
+--- Start of test/extension.test.js.map ---
+{"version":3,"file":"extension.test.js","sourceRoot":"","sources":["extension.test.ts"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;;;;;;;;AAAA,yBAAyB;AACzB,+CAAiC;AACjC,+CAAiC;AACjC,2CAA6B;AAC7B,4DAAyD;AAEzD,uCAAyB;AAEzB,KAAK,CAAC,sBAAsB,EAAE,GAAG,EAAE;IAC/B,MAAM,CAAC,MAAM,CAAC,sBAAsB,CAAC,kBAAkB,CAAC,CAAC;IAEzD,IAAI,CAAC,2BAA2B,EAAE,GAAG,EAAE;QACnC,MAAM,aAAa,GAAG,IAAI,CAAC,OAAO,CAAC,SAAS,EAAE,eAAe,CAAC,CAAC;QAC/D,MAAM,UAAU,GAAG,kBAAkB,CAAC;QAEtC,iCAAiC;QACjC,EAAE,CAAC,SAAS,CAAC,aAAa,EAAE,EAAE,SAAS,EAAE,IAAI,EAAE,CAAC,CAAC;QACjD,EAAE,CAAC,aAAa,CAAC,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,aAAa,CAAC,EAAE,6BAA6B,CAAC,CAAC;QACzF,EAAE,CAAC,aAAa,CAAC,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,aAAa,CAAC,EAAE,EAAE,CAAC,CAAC;QAE9D,MAAM,aAAa,GAAe;YAC9B;gBACI,KAAK,EAAE,aAAa;gBACpB,gBAAgB,EAAE,MAAM,CAAC,wBAAwB,CAAC,IAAI;gBACtD,GAAG,EAAE,MAAM,CAAC,GAAG,CAAC,IAAI,CAAC,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,aAAa,CAAC,CAAC;gBAC7D,OAAO,EAAE,IAAI;aAChB;YACD;gBACI,KAAK,EAAE,aAAa;gBACpB,gBAAgB,EAAE,MAAM,CAAC,wBAAwB,CAAC,IAAI;gBACtD,GAAG,EAAE,MAAM,CAAC,GAAG,CAAC,IAAI,CAAC,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,aAAa,CAAC,CAAC;gBAC7D,OAAO,EAAE,IAAI;aAChB;SACJ,CAAC;QAEF,UAAU;QACV,IAAA,iCAAe,EAAC,aAAa,EAAE,UAAU,EAAE,aAAa,EAAE,EAAE,EAAE,EAAE,EAAE,KAAK,CAAC,CAAC;QAEzE,SAAS;QACT,MAAM,UAAU,GAAG,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,UAAU,CAAC,CAAC;QACxD,MAAM,CAAC,EAAE,CAAC,EAAE,CAAC,UAAU,CAAC,UAAU,CAAC,EAAE,8BAA8B,CAAC,CAAC;QAErE,MAAM,OAAO,GAAG,EAAE,CAAC,YAAY,CAAC,UAAU,EAAE,OAAO,CAAC,CAAC;QACrD,MAAM,CAAC,EAAE,CAAC,OAAO,CAAC,QAAQ,CAAC,YAAY,CAAC,EAAE,4BAA4B,CAAC,CAAC;QACxE,MAAM,CAAC,EAAE,CAAC,OAAO,CAAC,QAAQ,CAAC,QAAQ,CAAC,EAAE,wBAAwB,CAAC,CAAC;QAChE,MAAM,CAAC,EAAE,CAAC,OAAO,CAAC,QAAQ,CAAC,aAAa,CAAC,EAAE,qBAAqB,CAAC,CAAC;QAClE,MAAM,CAAC,EAAE,CAAC,OAAO,CAAC,QAAQ,CAAC,aAAa,CAAC,EAAE,4BAA4B,CAAC,CAAC;QAEzE,UAAU;QACV,EAAE,CAAC,UAAU,CAAC,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,aAAa,CAAC,CAAC,CAAC;QACvD,EAAE,CAAC,UAAU,CAAC,IAAI,CAAC,IAAI,CAAC,aAAa,EAAE,aAAa,CAAC,CAAC,CAAC;QACvD,EAAE,CAAC,UAAU,CAAC,UAAU,CAAC,CAAC;QAC1B,EAAE,CAAC,SAAS,CAAC,aAAa,CAAC,CAAC;IAChC,CAAC,CAAC,CAAC;AACP,CAAC,CAAC,CAAC"}
+
+--- Start of test/extension.test.ts ---
+// test/extension.test.ts
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import * as path from 'path';
+import { generateContext } from '../src/generateContext';
+import { FileNode } from '../src/models/FileNode';
+import * as fs from 'fs';
 
 suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+    vscode.window.showInformationMessage('Start all tests.');
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
-	});
+    test('Generate Context Function', () => {
+        const workspaceRoot = path.resolve(__dirname, 'testWorkspace');
+        const outputFile = 'test_context.txt';
+
+        // Setup: Create a mock workspace
+        fs.mkdirSync(workspaceRoot, { recursive: true });
+        fs.writeFileSync(path.join(workspaceRoot, 'testFile.js'), 'console.log("Hello World");');
+        fs.writeFileSync(path.join(workspaceRoot, '__init__.py'), '');
+
+        const selectedFiles: FileNode[] = [
+            {
+                label: 'testFile.js',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(path.join(workspaceRoot, 'testFile.js')),
+                checked: true
+            },
+            {
+                label: '__init__.py',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(path.join(workspaceRoot, '__init__.py')),
+                checked: true
+            }
+        ];
+
+        // Execute
+        generateContext(workspaceRoot, outputFile, selectedFiles, [], [], false);
+
+        // Verify
+        const outputPath = path.join(workspaceRoot, outputFile);
+        assert.ok(fs.existsSync(outputPath), 'Output file was not created.');
+
+        const content = fs.readFileSync(outputPath, 'utf-8');
+        assert.ok(content.includes('File Tree:'), 'File Tree section missing.');
+        assert.ok(content.includes('Files:'), 'Files section missing.');
+        assert.ok(content.includes('testFile.js'), 'File entry missing.');
+        assert.ok(content.includes('__init__.py'), '__init__.py entry missing.');
+
+        // Cleanup
+        fs.unlinkSync(path.join(workspaceRoot, 'testFile.js'));
+        fs.unlinkSync(path.join(workspaceRoot, '__init__.py'));
+        fs.unlinkSync(outputPath);
+        fs.rmdirSync(workspaceRoot);
+    });
 });
 
+--- Start of src/extension.ts ---
+// src/extension.ts
+import * as vscode from 'vscode';
+import { FileTreeProvider } from './treeDataProvider';
+import { FileNode } from './models/FileNode';
+import { generateContext } from './generateContext';
+import * as path from 'path';
+
+export function activate(context: vscode.ExtensionContext) {
+    const workspaceRoot = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+
+    // Load persisted selections from global state
+    const persistedSelections: string[] = context.globalState.get('checkedFiles', []);
+    const checkedFiles = new Set<string>(persistedSelections);
+
+    const treeDataProvider = new FileTreeProvider(workspaceRoot, checkedFiles);
+    vscode.window.registerTreeDataProvider('contextGeneratorView', treeDataProvider);
+
+    vscode.commands.registerCommand('contextGenerator.toggleCheckbox', (element: FileNode) => {
+        if (element.checked) {
+            checkedFiles.delete(element.uri.fsPath);
+        } else {
+            checkedFiles.add(element.uri.fsPath);
+        }
+        treeDataProvider.refresh();
+
+        // Persist the selection
+        const allCheckedFiles = Array.from(checkedFiles);
+        context.globalState.update('checkedFiles', allCheckedFiles);
+    });
+
+    vscode.commands.registerCommand('contextGenerator.generateContext', () => {
+        const selectedFiles = treeDataProvider.getAllCheckedFiles();
+        const config = vscode.workspace.getConfiguration('contextGenerator');
+        const outputFile: string = config.get('outputFile') || 'file_context.txt';
+        const excludeFiles: string[] = config.get('excludeFiles') || [];
+        const excludePaths: string[] = config.get('excludePaths') || [];
+        const excludeHidden: boolean = config.get('excludeHidden') ?? true;
+
+        // Filter selectedFiles based on excludeFiles and excludePaths
+        const filteredFiles = selectedFiles.filter(file => {
+            const fileName = path.basename(file.uri.fsPath);
+            const relativePath = path.relative(workspaceRoot, file.uri.fsPath).replace(/\\/g, '/');
+
+            // Exclude based on file names
+            if (excludeFiles.includes(fileName)) {
+                return false;
+            }
+
+            // Exclude based on paths
+            if (excludePaths.some(excludePath => relativePath.startsWith(excludePath))) {
+                return false;
+            }
+
+            return true;
+        });
+
+        generateContext(workspaceRoot, outputFile, filteredFiles, excludeFiles, excludePaths, excludeHidden);
+    });
+}
+
+export function deactivate() {}
+
+--- Start of src/generateContext.ts ---
+// src/generateContext.ts
+import * as fs from 'fs';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { FileNode } from './models/FileNode';
+
+export function generateContext(
+    workspaceRoot: string,
+    outputFile: string,
+    selectedFiles: FileNode[],
+    excludeFiles: string[],
+    excludePaths: string[],
+    excludeHidden: boolean
+) {
+    let fileTree = 'File Tree:\n';
+    let filesContent = '\nFiles:\n';
+
+    // Build file tree string
+    selectedFiles.forEach(file => {
+        const relativePath = path.relative(workspaceRoot, file.uri.fsPath).replace(/\\/g, '/');
+        fileTree += `├── ${relativePath}\n`;
+    });
+
+    // Collect file contents
+    selectedFiles.forEach(file => {
+        const relativePath = path.relative(workspaceRoot, file.uri.fsPath).replace(/\\/g, '/');
+        const baseName = path.basename(file.uri.fsPath);
+
+        if (baseName === '__init__.py') {
+            filesContent += `\n--- Start of ${relativePath} ---\n`;
+        } else {
+            try {
+                const content = fs.readFileSync(file.uri.fsPath, 'utf-8');
+                filesContent += `\n--- Start of ${relativePath} ---\n${content}\n`;
+            } catch (error) {
+                filesContent += `\n--- Start of ${relativePath} ---\nError reading file: ${error}\n`;
+            }
+        }
+    });
+
+    // Write to output file
+    const outputPath = path.join(workspaceRoot, outputFile);
+    try {
+        fs.writeFileSync(outputPath, `${fileTree}\n${filesContent}`);
+        vscode.window.showInformationMessage(`Context successfully written to ${outputFile}`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to write to output file '${outputFile}': ${error}`);
+    }
+}
+
+--- Start of src/treeDataProvider.ts ---
+// src/treeDataProvider.ts
+import * as vscode from 'vscode';
+import * as path from 'path';
+import { FileNode } from './models/FileNode';
+import * as fs from 'fs';
+
+export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
+    private _onDidChangeTreeData: vscode.EventEmitter<FileNode | undefined | void> = new vscode.EventEmitter<FileNode | undefined | void>();
+    readonly onDidChangeTreeData: vscode.Event<FileNode | undefined | void> = this._onDidChangeTreeData.event;
+
+    constructor(private workspaceRoot: string, private checkedFiles: Set<string>) {}
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element: FileNode): vscode.TreeItem {
+        const treeItem = new vscode.TreeItem(element.label, element.collapsibleState);
+        treeItem.resourceUri = element.uri;
+        treeItem.command = {
+            command: 'contextGenerator.toggleCheckbox',
+            title: '',
+            arguments: [element]
+        };
+
+        // Set icons based on checked state
+        if (element.checked) {
+            treeItem.iconPath = new vscode.ThemeIcon('check');
+        } else {
+            treeItem.iconPath = new vscode.ThemeIcon('circle-outline');
+        }
+
+        // Tooltip
+        treeItem.tooltip = element.uri.fsPath;
+
+        return treeItem;
+    }
+
+    getChildren(element?: FileNode): Thenable<FileNode[]> {
+        if (!this.workspaceRoot) {
+            vscode.window.showInformationMessage('No workspace folder found');
+            return Promise.resolve([]);
+        }
+
+        if (element) {
+            return Promise.resolve(this.getFileNodes(element.uri.fsPath));
+        } else {
+            return Promise.resolve(this.getFileNodes(this.workspaceRoot));
+        }
+    }
+
+    private getFileNodes(dirPath: string): FileNode[] {
+        let files: string[];
+        try {
+            files = fs.readdirSync(dirPath);
+        } catch (err) {
+            vscode.window.showErrorMessage(`Unable to read directory: ${dirPath}`);
+            return [];
+        }
+
+        return files.map(file => {
+            const fullPath = path.join(dirPath, file);
+            let stats: fs.Stats;
+            try {
+                stats = fs.statSync(fullPath);
+            } catch (err) {
+                vscode.window.showErrorMessage(`Unable to access file: ${fullPath}`);
+                return null;
+            }
+
+            const isDirectory = stats.isDirectory();
+            const relativePath = path.relative(this.workspaceRoot, fullPath);
+            const checked = this.checkedFiles.has(fullPath);
+
+            return {
+                label: file + (isDirectory ? path.sep : ''),
+                collapsibleState: isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(fullPath),
+                checked: checked,
+                children: isDirectory ? [] : undefined
+            } as FileNode;
+        }).filter(node => node !== null) as FileNode[];
+    }
+
+    getAllCheckedFiles(): FileNode[] {
+        const checkedFiles: FileNode[] = [];
+        const traverse = (nodes: FileNode[]) => {
+            nodes.forEach(node => {
+                if (node.checked && !node.children) {
+                    checkedFiles.push(node);
+                }
+                if (node.children) {
+                    traverse(node.children);
+                }
+            });
+        };
+        traverse(this.getFileNodes(this.workspaceRoot));
+        return checkedFiles;
+    }
+
+    setCheckedFiles(paths: string[]) {
+        this.checkedFiles = new Set(paths);
+    }
+}
+
+--- Start of src/models/FileNode.ts ---
+// src/models/FileNode.ts
+import * as vscode from 'vscode';
+
+export interface FileNode {
+    label: string;
+    collapsibleState: vscode.TreeItemCollapsibleState;
+    uri: vscode.Uri;
+    checked: boolean;
+    children?: FileNode[];
+}

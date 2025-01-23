@@ -82,20 +82,22 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
         }).filter(node => node !== null) as FileNode[];
     }
 
+    /**
+     * Returns an array of FileNodes that are currently checked.
+     */
     getAllCheckedFiles(): FileNode[] {
-        const checkedFiles: FileNode[] = [];
-        const traverse = (nodes: FileNode[]) => {
-            nodes.forEach(node => {
-                if (node.checked && !node.children) {
-                    checkedFiles.push(node);
-                }
-                if (node.children) {
-                    traverse(node.children);
-                }
-            });
-        };
-        traverse(this.getFileNodes(this.workspaceRoot));
-        return checkedFiles;
+        const checkedFileNodes: FileNode[] = [];
+
+        this.checkedFiles.forEach(filePath => {
+            checkedFileNodes.push({
+                label: path.basename(filePath),
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(filePath),
+                checked: true
+            } as FileNode);
+        });
+
+        return checkedFileNodes;
     }
 
     setCheckedFiles(paths: string[]) {

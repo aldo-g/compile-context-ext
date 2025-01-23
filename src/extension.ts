@@ -24,6 +24,9 @@ export function activate(context: vscode.ExtensionContext) {
             const isChecked = checkedFiles.has(element.uri.fsPath);
             const allChildFilePaths = await getAllChildFiles(element.uri.fsPath);
 
+            console.log(`Toggling directory: ${element.uri.fsPath}`);
+            console.log(`All child files to process: ${allChildFilePaths.join(', ')}`);
+
             if (isChecked) {
                 // Deselect all child files
                 allChildFilePaths.forEach(filePath => checkedFiles.delete(filePath));
@@ -138,6 +141,7 @@ async function getAllChildFiles(dirPath: string): Promise<string[]> {
         vscode.window.showErrorMessage(`Error reading directory ${dirPath}: ${err}`);
     }
 
+    console.log(`Collected child files for ${dirPath}: ${results.join(', ')}`);
     return results;
 }
 

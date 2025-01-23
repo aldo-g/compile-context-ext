@@ -83,6 +83,11 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
         const config = vscode.workspace.getConfiguration('contextGenerator');
         const excludeHidden: boolean = config.get('excludeHidden') ?? true;
 
+        console.log(`Listing files in directory: ${dirPath}`);
+        files.forEach(file => {
+            console.log(`- ${file}`);
+        });
+
         return files.map(file => {
             const fullPath = path.join(dirPath, file);
             let stats: fs.Stats;
@@ -99,6 +104,7 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
 
             // Exclude hidden files/directories if configured
             if (excludeHidden && file.startsWith('.')) {
+                console.log(`Excluding hidden file/directory: ${file}`);
                 return null;
             }
 

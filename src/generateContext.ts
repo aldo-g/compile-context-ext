@@ -1,4 +1,6 @@
-// src/generateContext.ts
+/**
+ * Generates a context file containing the file tree and contents of selected files.
+ */
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -33,15 +35,6 @@ export function generateContext(
     let fileTree = 'File Tree:\n';
     let filesContent = '\nFiles:\n';
 
-    console.log('Starting context generation...');
-
-    // Log selected files for debugging
-    console.log(`Selected Files (${selectedFiles.length}):`);
-    selectedFiles.forEach(file => {
-        console.log(`- ${file.uri.fsPath}`);
-    });
-
-    // Build hierarchical tree structure from selected files
     const treeRoot: TreeNode = { name: '', children: new Map(), isFile: false };
 
     selectedFiles.forEach(file => {
@@ -57,53 +50,35 @@ export function generateContext(
                     children: new Map(),
                     isFile: isFile,
                 });
-                console.log(`Added ${isFile ? 'file' : 'directory'}: ${part}`);
             }
             currentNode = currentNode.children.get(part)!;
         });
     });
 
-    // Serialize the tree structure into a string
     fileTree += serializeTree(treeRoot, '');
 
-    console.log(`Constructed File Tree:\n${fileTree}`);
-
-    // Collect file contents
     selectedFiles.forEach(file => {
         const relativePath = path.relative(workspaceRoot, file.uri.fsPath).replace(/\\/g, '/');
         const baseName = path.basename(file.uri.fsPath);
 
-        // Ensure it's a file before attempting to read
         if (isDirectory(file.uri.fsPath)) {
-            console.warn(`Skipping directory: ${relativePath}`);
-            return; // Skip directories
+            return;
         }
 
-        if (baseName === '__init__.py') {
-            filesContent += `\n--- Start of ${relativePath} ---\n`;
-        } else {
-            try {
-                const content = fs.readFileSync(file.uri.fsPath, 'utf-8');
-                filesContent += `\n--- Start of ${relativePath} ---\n${content}\n`;
-                console.log(`Added content for file: ${relativePath}`);
-            } catch (error) {
-                filesContent += `\n--- Start of ${relativePath} ---\nError reading file: ${error}\n`;
-                console.error(`Error reading file ${relativePath}: ${error}`);
-            }
+        try {
+            const content = fs.readFileSync(file.uri.fsPath, 'utf-8');
+            filesContent += `\n--- Start of ${relativePath} ---\n${content}\n`;
+        } catch (error) {
+            filesContent += `\n--- Start of ${relativePath} ---\nError reading file: ${error}\n`;
         }
     });
 
-    console.log(`Files Content:\n${filesContent}`);
-
-    // Write to output file
     const outputPath = path.join(workspaceRoot, outputFile);
     try {
         fs.writeFileSync(outputPath, `${fileTree}\n${filesContent}`);
         vscode.window.showInformationMessage(`Context successfully written to ${outputFile}`);
-        console.log(`Context file written to ${outputPath}`);
     } catch (error) {
         vscode.window.showErrorMessage(`Failed to write to output file '${outputFile}': ${error}`);
-        console.error(`Failed to write to output file '${outputFile}': ${error}`);
     }
 }
 
@@ -122,7 +97,6 @@ function serializeTree(node: TreeNode, prefix: string): string {
         const isLast = index === total - 1;
         const connector = isLast ? '└── ' : '├── ';
         const newPrefix = prefix + (isLast ? '    ' : '│   ');
-        console.log(`Serializing child: ${child.name}, isFile: ${child.isFile}, isLast: ${isLast}`);
         result += `${prefix}${connector}${child.name}${child.isFile ? '' : '/'}\n`;
 
         if (!child.isFile) {
@@ -142,7 +116,6 @@ function isDirectory(filePath: string): boolean {
     try {
         return fs.statSync(filePath).isDirectory();
     } catch (err) {
-        console.error(`Error accessing path ${filePath}: ${err}`);
         return false;
     }
 }

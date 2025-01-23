@@ -4,16 +4,27 @@ import * as path from 'path';
 import { FileNode } from './models/FileNode';
 import * as fs from 'fs';
 
+/**
+ * Provides data for the File Tree View.
+ */
 export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
     private _onDidChangeTreeData: vscode.EventEmitter<FileNode | undefined | void> = new vscode.EventEmitter<FileNode | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<FileNode | undefined | void> = this._onDidChangeTreeData.event;
 
     constructor(private workspaceRoot: string, private checkedFiles: Set<string>) {}
 
+    /**
+     * Refreshes the Tree View.
+     */
     refresh(): void {
         this._onDidChangeTreeData.fire();
     }
 
+    /**
+     * Returns the TreeItem representation of a FileNode.
+     * @param element The FileNode to represent.
+     * @returns A TreeItem.
+     */
     getTreeItem(element: FileNode): vscode.TreeItem {
         const treeItem = new vscode.TreeItem(element.label, element.collapsibleState);
         treeItem.resourceUri = element.uri;
@@ -36,6 +47,11 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
         return treeItem;
     }
 
+    /**
+     * Returns the children of a given FileNode.
+     * @param element The parent FileNode.
+     * @returns A promise resolving to an array of FileNodes.
+     */
     getChildren(element?: FileNode): Thenable<FileNode[]> {
         if (!this.workspaceRoot) {
             vscode.window.showInformationMessage('No workspace folder found');
@@ -49,6 +65,11 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
         }
     }
 
+    /**
+     * Retrieves FileNodes within a given directory path.
+     * @param dirPath The directory path.
+     * @returns An array of FileNodes.
+     */
     private getFileNodes(dirPath: string): FileNode[] {
         let files: string[];
         try {
@@ -57,6 +78,10 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
             vscode.window.showErrorMessage(`Unable to read directory: ${dirPath}`);
             return [];
         }
+
+        // Fetch configuration
+        const config = vscode.workspace.getConfiguration('contextGenerator');
+        const excludeHidden: boolean = config.get('excludeHidden') ?? true;
 
         return files.map(file => {
             const fullPath = path.join(dirPath, file);
@@ -72,6 +97,11 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
             const relativePath = path.relative(this.workspaceRoot, fullPath);
             const checked = this.checkedFiles.has(fullPath);
 
+            // Exclude hidden files/directories if configured
+            if (excludeHidden && file.startsWith('.')) {
+                return null;
+            }
+
             return {
                 label: file + (isDirectory ? path.sep : ''),
                 collapsibleState: isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
@@ -84,6 +114,7 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
 
     /**
      * Returns an array of FileNodes that are currently checked.
+     * @returns An array of checked FileNodes.
      */
     getAllCheckedFiles(): FileNode[] {
         const checkedFileNodes: FileNode[] = [];
@@ -97,9 +128,15 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
             } as FileNode);
         });
 
+        console.log(`getAllCheckedFiles: ${checkedFileNodes.map(file => file.uri.fsPath).join(', ')}`);
+
         return checkedFileNodes;
     }
 
+    /**
+     * Updates the checkedFiles Set.
+     * @param paths Array of file paths to set as checked.
+     */
     setCheckedFiles(paths: string[]) {
         this.checkedFiles = new Set(paths);
     }

@@ -4,8 +4,9 @@ node_modules/
 # VSCode settings
 .vscode/
 
-# Output directory
+# Output directories
 out/
+build/
 
 # Test files
 test/testWorkspace/
@@ -18,6 +19,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-file_context.txt
+# Compile Context Output
+.compile-context/
 
+# VSCode test directory
 .vscode-test/
+
+# OS-specific files
+.DS_Store
+Thumbs.db

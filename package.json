@@ -3,7 +3,7 @@
   "displayName": "Compile Context",
   "description": "Compiles context information for selected files within your workspace.",
   "version": "0.2.0",
-  "publisher": "aldo-g",
+  "publisher": "Aldo-e-g",
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -113,6 +113,11 @@
       }
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aldo-g/compile-context-ext"
+  },
+  "license": "MIT",
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

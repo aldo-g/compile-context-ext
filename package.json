@@ -10,7 +10,15 @@
   "categories": [
     "Other"
   ],
+  "icon": "assets/icon.png",
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onCommand:compileContext.toggleCheckbox",
+    "onCommand:compileContext.compileContext",
+    "onCommand:compileContext.selectAll",
+    "onCommand:compileContext.deselectAll",
+    "onView:compileContextView"
+  ],
   "contributes": {
     "commands": [
       {
@@ -81,7 +89,7 @@
           "items": {
             "type": "string"
           },
-          "default": [".env", "package-lock.json", "LICENSE"],
+          "default": ["LICENCE", "package-lock.json", "LICENSE"],
           "description": "List of filenames to exclude."
         },
         "compileContext.excludePaths": {
@@ -89,7 +97,7 @@
           "items": {
             "type": "string"
           },
-          "default": [".git", "__pycache__", "build", ".compile-context", "LICENCE"],
+          "default": [".git", "__pycache__", "build", ".compile-context"],
           "description": "List of directory paths to exclude."
         },
         "compileContext.outputFile": {

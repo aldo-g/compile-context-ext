@@ -1,4 +1,3 @@
-// src/extension.ts
 /**
  * Main activation file for the Compile Context VSCode extension.
  */
@@ -10,119 +9,91 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 
 /**
- * Activates the Compile Context extension, setting up the Tree View and registering commands.
- * @param context The extension context.
+ * Activates the Compile Context extension by setting up the Tree View and related commands.
  */
 export function activate(context: vscode.ExtensionContext) {
     const workspaceRoot = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-
     const persistedSelections: string[] = context.globalState.get('checkedFiles', []);
     const checkedFiles = new Set<string>(persistedSelections);
-
     const treeDataProvider = new FileTreeProvider(workspaceRoot, checkedFiles);
-    const treeView = vscode.window.createTreeView('compileContextView', { treeDataProvider: treeDataProvider });
+    const treeView = vscode.window.createTreeView('compileContextView', { treeDataProvider });
 
     const expandedSet = new Set<string>();
-
-    treeView.onDidExpandElement(event => {
-        expandedSet.add(event.element.uri.fsPath);
-    });
-
-    treeView.onDidCollapseElement(event => {
-        expandedSet.delete(event.element.uri.fsPath);
-    });
+    treeView.onDidExpandElement(e => expandedSet.add(e.element.uri.fsPath));
+    treeView.onDidCollapseElement(e => expandedSet.delete(e.element.uri.fsPath));
 
     /**
-     * Refreshes the entire Tree View while maintaining the expansion state.
+     * Refreshes the entire Tree View.
      */
     const refreshTreeView = async () => {
         treeDataProvider.refresh();
     };
 
     /**
-     * Toggles the checkbox state of a FileNode.
-     * @param element The FileNode to toggle.
+     * Toggles the selection state of a FileNode.
      */
     vscode.commands.registerCommand('compileContext.toggleCheckbox', async (element: FileNode) => {
-        const affectedPaths = new Set<string>();
-
+        if (!workspaceRoot) return;
         if (isDirectory(element)) {
             const allChildFilePaths = await getAllChildFiles(element.uri.fsPath);
-            const isChecked = allChildFilePaths.length > 0 && allChildFilePaths.every(filePath => checkedFiles.has(filePath));
-
+            const isChecked = allChildFilePaths.length > 0 && allChildFilePaths.every(fp => checkedFiles.has(fp));
             if (isChecked) {
-                allChildFilePaths.forEach(filePath => {
-                    checkedFiles.delete(filePath);
-                    console.log(`Removed: ${filePath}`);
-                    affectedPaths.add(path.dirname(filePath));
+                allChildFilePaths.forEach(fp => {
+                    checkedFiles.delete(fp);
+                    console.log(`Removed: ${fp}`);
                 });
             } else {
-                allChildFilePaths.forEach(filePath => {
-                    checkedFiles.add(filePath);
-                    console.log(`Added: ${filePath}`);
-                    affectedPaths.add(path.dirname(filePath));
+                allChildFilePaths.forEach(fp => {
+                    checkedFiles.add(fp);
+                    console.log(`Added: ${fp}`);
                 });
             }
-
-            affectedPaths.add(element.uri.fsPath);
         } else {
             if (element.checked) {
                 checkedFiles.delete(element.uri.fsPath);
                 console.log(`Removed: ${element.uri.fsPath}`);
-                affectedPaths.add(path.dirname(element.uri.fsPath));
             } else {
                 checkedFiles.add(element.uri.fsPath);
                 console.log(`Added: ${element.uri.fsPath}`);
-                affectedPaths.add(path.dirname(element.uri.fsPath));
             }
-
-            affectedPaths.add(path.dirname(element.uri.fsPath));
         }
-
-        // Instead of refreshing specific nodes, refresh the entire tree
         await refreshTreeView();
-
-        const allCheckedFiles = Array.from(checkedFiles);
-        context.globalState.update('checkedFiles', allCheckedFiles);
+        context.globalState.update('checkedFiles', Array.from(checkedFiles));
     });
 
     /**
      * Compiles the selected context into the output file.
      */
     vscode.commands.registerCommand('compileContext.compileContext', async () => {
+        if (!workspaceRoot) return;
         const selectedFiles = treeDataProvider.getAllCheckedFiles();
-
-        if (selectedFiles.length === 0) {
+        if (!selectedFiles.length) {
             vscode.window.showWarningMessage('No files selected. Please select at least one file to compile context.');
             return;
         }
 
         const config = vscode.workspace.getConfiguration('compileContext');
-        const outputFile: string = config.get('outputFile') || 'file_context.txt';
+        const outputFile: string = config.get('outputFile') || '.compile-context/file_context.txt';
         const excludeFiles: string[] = config.get('excludeFiles') || [];
         const excludePaths: string[] = config.get('excludePaths') || [];
         const excludeHidden: boolean = config.get('excludeHidden') ?? true;
 
-        const filteredFiles = selectedFiles.filter(file => {
-            const fileName = path.basename(file.uri.fsPath);
-            const relativePath = path.relative(workspaceRoot, file.uri.fsPath).replace(/\\/g, '/');
+        try {
+            const subDir = path.dirname(outputFile);
+            await fs.mkdir(path.join(workspaceRoot, subDir), { recursive: true });
+        } catch (err) {
+            console.error(`Failed to create subdirectory for output file: ${err}`);
+        }
 
-            if (excludeFiles.includes(fileName)) {
-                return false;
-            }
-
-            if (excludePaths.some(excludePath => relativePath.startsWith(excludePath))) {
-                return false;
-            }
-
-            if (excludeHidden && isHidden(relativePath)) {
-                return false;
-            }
-
+        const filtered = selectedFiles.filter(file => {
+            const rel = path.relative(workspaceRoot, file.uri.fsPath).replace(/\\/g, '/');
+            const base = path.basename(rel);
+            if (excludeFiles.includes(base)) return false;
+            if (excludePaths.some(ex => rel.startsWith(ex))) return false;
+            if (excludeHidden && isHidden(rel)) return false;
             return true;
         });
-
-        if (filteredFiles.length === 0) {
+        if (!filtered.length) {
             vscode.window.showWarningMessage('No files to include after applying exclusions.');
             return;
         }
@@ -131,10 +102,10 @@ export function activate(context: vscode.ExtensionContext) {
             location: vscode.ProgressLocation.Notification,
             title: "Compiling Context...",
             cancellable: false
-        }, async (progress) => {
+        }, async progress => {
             progress.report({ increment: 0 });
             try {
-                await compileContext(workspaceRoot, outputFile, filteredFiles, excludeFiles, excludePaths, excludeHidden);
+                await compileContext(workspaceRoot, outputFile, filtered, excludeFiles, excludePaths, excludeHidden);
                 progress.report({ increment: 100 });
                 vscode.window.showInformationMessage('Context compilation completed successfully!');
             } catch (error: unknown) {
@@ -152,11 +123,12 @@ export function activate(context: vscode.ExtensionContext) {
      * Selects all files in the workspace.
      */
     vscode.commands.registerCommand('compileContext.selectAll', async () => {
+        if (!workspaceRoot) return;
         const allFilePaths = await getAllFiles(workspaceRoot);
-        allFilePaths.forEach(filePath => {
-            if (!checkedFiles.has(filePath)) {
-                checkedFiles.add(filePath);
-                console.log(`Added: ${filePath}`);
+        allFilePaths.forEach(fp => {
+            if (!checkedFiles.has(fp)) {
+                checkedFiles.add(fp);
+                console.log(`Added: ${fp}`);
             }
         });
         await refreshTreeView();
@@ -167,8 +139,8 @@ export function activate(context: vscode.ExtensionContext) {
      * Deselects all files in the workspace.
      */
     vscode.commands.registerCommand('compileContext.deselectAll', async () => {
-        checkedFiles.forEach(filePath => {
-            console.log(`Removed: ${filePath}`);
+        checkedFiles.forEach(fp => {
+            console.log(`Removed: ${fp}`);
         });
         checkedFiles.clear();
         await refreshTreeView();
@@ -176,7 +148,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     /**
-     * Adds a Compile Context button to the Tree View's title bar.
+     * Command for the Compile Context button in the title bar.
      */
     vscode.commands.registerCommand('compileContext.compileContextButton', async () => {
         vscode.commands.executeCommand('compileContext.compileContext');
@@ -184,54 +156,44 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 /**
- * Determines if a FileNode represents a directory.
- * @param node The FileNode to check.
- * @returns True if it's a directory, else false.
+ * Checks if a FileNode is a directory based on collapsible state.
  */
 function isDirectory(node: FileNode): boolean {
     return node.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed || node.collapsibleState === vscode.TreeItemCollapsibleState.Expanded;
 }
 
 /**
- * Recursively collects all file paths under a given directory asynchronously.
- * @param dirPath The directory path to traverse.
- * @returns A promise that resolves to an array of file paths.
+ * Recursively gathers file paths under a directory, asynchronously.
  */
 async function getAllChildFiles(dirPath: string): Promise<string[]> {
     let results: string[] = [];
-
     try {
         const list = await fs.readdir(dirPath, { withFileTypes: true });
         for (const dirent of list) {
-            const filePath = path.join(dirPath, dirent.name);
+            const fp = path.join(dirPath, dirent.name);
             if (dirent.isDirectory()) {
-                const subDirFiles = await getAllChildFiles(filePath);
-                results = results.concat(subDirFiles);
+                const sub = await getAllChildFiles(fp);
+                results = results.concat(sub);
             } else if (dirent.isFile()) {
-                results.push(filePath);
+                results.push(fp);
             }
         }
     } catch (err) {
-        vscode.window.showErrorMessage(`Error reading directory ${dirPath}:`, String(err));
+        vscode.window.showErrorMessage(`Error reading directory ${dirPath}: ${String(err)}`);
     }
-
     return results;
 }
 
 /**
- * Retrieves all file paths within the workspace.
- * @param dirPath The root directory.
- * @returns A promise that resolves to an array of file paths.
+ * Retrieves all file paths in the workspace.
  */
 async function getAllFiles(dirPath: string): Promise<string[]> {
-    return await getAllChildFiles(dirPath);
+    return getAllChildFiles(dirPath);
 }
 
 /**
- * Determines if a file or directory is hidden based on its relative path.
- * @param relativePath The path relative to the workspace root.
- * @returns True if hidden, else false.
+ * Checks if a file path is hidden by checking path parts starting with '.'.
  */
-function isHidden(relativePath: string): boolean {
-    return relativePath.split(path.sep).some(part => part.startsWith('.'));
+function isHidden(relPath: string): boolean {
+    return relPath.split(path.sep).some(part => part.startsWith('.'));
 }

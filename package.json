@@ -89,12 +89,12 @@
           "items": {
             "type": "string"
           },
-          "default": [".git", "__pycache__", "build"],
+          "default": [".git", "__pycache__", "build", ".compile-context", "LICENCE"],
           "description": "List of directory paths to exclude."
         },
         "compileContext.outputFile": {
           "type": "string",
-          "default": "file_context.txt",
+          "default": ".compile-context/file_context.txt",
           "description": "Output file for the compiled context."
         },
         "compileContext.excludeHidden": {

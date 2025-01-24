@@ -14,9 +14,7 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
     readonly onDidChangeTreeData: vscode.Event<FileNode | undefined | void> = this._onDidChangeTreeData.event;
 
     /**
-     * Initializes the FileTreeProvider with the workspace root and the set of checked files.
-     * @param workspaceRoot The root directory of the workspace.
-     * @param checkedFiles A set containing the paths of checked files.
+     * Initializes the FileTreeProvider with a workspace root and a set of checked files.
      */
     constructor(private workspaceRoot: string, private checkedFiles: Set<string>) {}
 
@@ -28,54 +26,43 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
     }
 
     /**
-     * Refreshes a specific FileNode in the Tree View.
-     * @param node The FileNode to refresh.
+     * Refreshes a specific node in the Tree View.
      */
     refreshNode(node: FileNode): void {
         this._onDidChangeTreeData.fire(node);
     }
 
     /**
-     * Retrieves the TreeItem representation of a FileNode.
-     * @param element The FileNode to represent.
-     * @returns A configured TreeItem.
+     * Returns a TreeItem for a FileNode.
      */
     getTreeItem(element: FileNode): vscode.TreeItem {
-        const selectionSymbol = this.getSelectionSymbol(element);
-        const treeItem = new vscode.TreeItem(`${selectionSymbol} ${path.basename(element.label)}`, element.collapsibleState);
+        const symbol = this.getSelectionSymbol(element);
+        const treeItem = new vscode.TreeItem(`${symbol} ${path.basename(element.label)}`, element.collapsibleState);
         treeItem.resourceUri = element.uri;
         treeItem.command = {
             command: 'compileContext.toggleCheckbox',
             title: '',
             arguments: [element]
         };
-
-        // Assign a stable unique ID based on the file path
         treeItem.id = element.uri.fsPath;
-
         if (element.collapsibleState !== vscode.TreeItemCollapsibleState.None) {
             treeItem.iconPath = new vscode.ThemeIcon('folder');
         } else {
             const icon = getFileIcon(element.label);
             treeItem.iconPath = icon ? new vscode.ThemeIcon(icon) : new vscode.ThemeIcon('file');
         }
-
         treeItem.tooltip = element.uri.fsPath;
-
         return treeItem;
     }
 
     /**
-     * Retrieves the children of a given FileNode or the root if no element is provided.
-     * @param element The parent FileNode.
-     * @returns A promise resolving to an array of FileNodes.
+     * Returns the children of a FileNode or the root directory if none is given.
      */
     getChildren(element?: FileNode): Thenable<FileNode[]> {
         if (!this.workspaceRoot) {
             vscode.window.showInformationMessage('No workspace folder found');
             return Promise.resolve([]);
         }
-
         if (element) {
             return Promise.resolve(this.getFileNodes(element.uri.fsPath));
         } else {
@@ -84,10 +71,7 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
     }
 
     /**
-     * Generates an array of FileNodes for a specific directory path.
-     * Directories are listed first in alphabetical order, followed by files in alphabetical order.
-     * @param dirPath The directory path to generate FileNodes for.
-     * @returns An array of FileNodes.
+     * Builds FileNodes from a directory path, applying exclusions for paths or hidden entries.
      */
     private getFileNodes(dirPath: string): FileNode[] {
         let entries: string[];
@@ -97,199 +81,150 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
             vscode.window.showErrorMessage(`Unable to read directory: ${dirPath}`);
             return [];
         }
-
         const config = vscode.workspace.getConfiguration('compileContext');
         const excludeHidden: boolean = config.get('excludeHidden') ?? true;
-
-        const directories: string[] = [];
+        const excludePaths: string[] = config.get('excludePaths') || [];
+        const dirs: string[] = [];
         const files: string[] = [];
-
-        entries.forEach(entry => {
-            if (excludeHidden && entry.startsWith('.')) {
-                return;
-            }
-            const fullPath = path.join(dirPath, entry);
+        entries.forEach(e => {
+            if (excludeHidden && e.startsWith('.')) return;
+            const fp = path.join(dirPath, e);
+            const rel = path.relative(this.workspaceRoot, fp).replace(/\\/g, '/');
+            if (excludePaths.some(pth => rel.startsWith(pth))) return;
             let stats: fs.Stats;
             try {
-                stats = fs.statSync(fullPath);
-            } catch (err) {
-                vscode.window.showErrorMessage(`Unable to access file: ${fullPath}`);
+                stats = fs.statSync(fp);
+            } catch {
                 return;
             }
             if (stats.isDirectory()) {
-                directories.push(entry);
+                dirs.push(e);
             } else {
-                files.push(entry);
+                files.push(e);
             }
         });
-
-        directories.sort((a, b) => a.localeCompare(b));
+        dirs.sort((a, b) => a.localeCompare(b));
         files.sort((a, b) => a.localeCompare(b));
-
-        const sortedEntries = [...directories, ...files];
-
-        return sortedEntries.map(file => {
-            const fullPath = path.join(dirPath, file);
+        const sorted = [...dirs, ...files];
+        return sorted.map(e => {
+            const fp = path.join(dirPath, e);
             let stats: fs.Stats;
             try {
-                stats = fs.statSync(fullPath);
-            } catch (err) {
-                vscode.window.showErrorMessage(`Unable to access file: ${fullPath}`);
+                stats = fs.statSync(fp);
+            } catch {
                 return null;
             }
-
-            const isDirectory = stats.isDirectory();
-
+            const isDir = stats.isDirectory();
             let checked = false;
-            if (isDirectory) {
-                const allChildFilePaths = getAllChildFilesSync(fullPath);
-                const allSelected = allChildFilePaths.length > 0 && allChildFilePaths.every(filePath => this.checkedFiles.has(filePath));
-                const someSelected = allChildFilePaths.some(filePath => this.checkedFiles.has(filePath));
-                checked = allSelected;
+            if (isDir) {
+                const child = getAllChildFilesSync(fp);
+                const allSel = child.every(f => this.checkedFiles.has(f));
+                checked = allSel;
             } else {
-                checked = this.checkedFiles.has(fullPath);
+                checked = this.checkedFiles.has(fp);
             }
-
-            const fileNode: FileNode = {
-                label: file + (isDirectory ? path.sep : ''),
-                collapsibleState: isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
-                uri: vscode.Uri.file(fullPath),
-                checked: checked
+            const node: FileNode = {
+                label: e + (isDir ? path.sep : ''),
+                collapsibleState: isDir ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+                uri: vscode.Uri.file(fp),
+                checked
             };
-
-            return fileNode;
-        }).filter(node => node !== null) as FileNode[];
+            return node;
+        }).filter(n => n !== null) as FileNode[];
     }
 
     /**
-     * Retrieves all currently checked FileNodes.
-     * @returns An array of checked FileNodes.
+     * Retrieves all checked files, constructing FileNodes as needed.
      */
     getAllCheckedFiles(): FileNode[] {
-        const checkedFileNodes: FileNode[] = [];
-
-        this.checkedFiles.forEach(filePath => {
+        const arr: FileNode[] = [];
+        this.checkedFiles.forEach(fp => {
             try {
-                const stats = fs.statSync(filePath);
+                const stats = fs.statSync(fp);
                 const isDir = stats.isDirectory();
-                checkedFileNodes.push({
-                    label: path.basename(filePath) + (isDir ? path.sep : ''),
+                arr.push({
+                    label: path.basename(fp) + (isDir ? path.sep : ''),
                     collapsibleState: isDir ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
-                    uri: vscode.Uri.file(filePath),
+                    uri: vscode.Uri.file(fp),
                     checked: true
-                } as FileNode);
-            } catch (err) {
-                console.error(`Error accessing file ${filePath}:`, err);
-            }
+                });
+            } catch {}
         });
-
-        return checkedFileNodes;
+        return arr;
     }
 
     /**
-     * Determines the selection symbol based on the selection state of the FileNode.
-     * @param element The FileNode to evaluate.
-     * @returns A Unicode circle symbol representing the selection state.
+     * Determines which circle symbol (●, ◑, ○) to display for a FileNode.
      */
-    private getSelectionSymbol(element: FileNode): string {
-        if (element.collapsibleState !== vscode.TreeItemCollapsibleState.None) {
-            const allChildFilePaths = getAllChildFilesSync(element.uri.fsPath);
-            const allSelected = allChildFilePaths.length > 0 && allChildFilePaths.every(filePath => this.checkedFiles.has(filePath));
-            const someSelected = allChildFilePaths.some(filePath => this.checkedFiles.has(filePath));
-
-            if (allSelected) {
-                return '●';
-            } else if (someSelected) {
-                return '◑';
-            } else {
-                return '○';
-            }
+    private getSelectionSymbol(e: FileNode): string {
+        if (e.collapsibleState !== vscode.TreeItemCollapsibleState.None) {
+            const child = getAllChildFilesSync(e.uri.fsPath);
+            const allSel = child.length > 0 && child.every(f => this.checkedFiles.has(f));
+            const someSel = child.some(f => this.checkedFiles.has(f));
+            if (allSel) return '●';
+            if (someSel) return '◑';
+            return '○';
         } else {
-            return element.checked ? '●' : '○';
+            return e.checked ? '●' : '○';
         }
     }
 
     /**
-     * Retrieves the parent FileNode of a given FileNode.
-     * @param element The FileNode whose parent is to be found.
-     * @returns The parent FileNode or undefined if at root.
+     * Returns the parent FileNode of a given node by constructing its path.
      */
-    getParent(element: FileNode): vscode.ProviderResult<FileNode> {
-        const parentPath = path.dirname(element.uri.fsPath);
-        if (parentPath === this.workspaceRoot) {
-            return undefined; // Root has no parent
-        }
+    getParent(e: FileNode): vscode.ProviderResult<FileNode> {
+        const par = path.dirname(e.uri.fsPath);
+        if (par === this.workspaceRoot) return undefined;
         try {
-            const stats = fs.statSync(parentPath);
-            if (stats.isDirectory()) {
+            const st = fs.statSync(par);
+            if (st.isDirectory()) {
                 return {
-                    label: path.basename(parentPath) + path.sep,
+                    label: path.basename(par) + path.sep,
                     collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-                    uri: vscode.Uri.file(parentPath),
-                    checked: this.checkedFiles.has(parentPath)
-                } as FileNode;
+                    uri: vscode.Uri.file(par),
+                    checked: this.checkedFiles.has(par)
+                };
             }
-            return undefined;
-        } catch (err) {
-            console.error(`Error accessing parent directory ${parentPath}:`, err);
-            return undefined;
-        }
+        } catch {}
+        return undefined;
     }
 }
 
 /**
- * Recursively collects all file paths under a given directory synchronously.
- * @param dirPath The directory path to traverse.
- * @returns An array of file paths.
+ * Recursively collects file paths in a directory synchronously.
  */
 function getAllChildFilesSync(dirPath: string): string[] {
     let results: string[] = [];
-
     try {
         const list = fs.readdirSync(dirPath, { withFileTypes: true });
-        list.forEach(dirent => {
-            const filePath = path.join(dirPath, dirent.name);
-            if (dirent.isDirectory()) {
-                results = results.concat(getAllChildFilesSync(filePath));
-            } else if (dirent.isFile()) {
-                results.push(filePath);
+        list.forEach(d => {
+            const fp = path.join(dirPath, d.name);
+            if (d.isDirectory()) {
+                results = results.concat(getAllChildFilesSync(fp));
+            } else if (d.isFile()) {
+                results.push(fp);
             }
         });
-    } catch (err) {
-        console.error(`Error traversing directory ${dirPath}:`, err);
-        vscode.window.showErrorMessage(`Error traversing directory ${dirPath}: ${err}`);
-    }
-
+    } catch {}
     return results;
 }
 
 /**
- * Determines the appropriate ThemeIcon based on the file extension.
- * @param filename The name of the file.
- * @returns A string representing the ThemeIcon name.
+ * Determines an icon for a file based on its extension.
  */
-function getFileIcon(filename: string): string | undefined {
-    const extension = path.extname(filename).toLowerCase();
-    switch (extension) {
+function getFileIcon(name: string): string | undefined {
+    const ext = path.extname(name).toLowerCase();
+    switch (ext) {
         case '.js':
-        case '.jsx':
-            return 'javascript';
+        case '.jsx': return 'javascript';
         case '.ts':
-        case '.tsx':
-            return 'typescript';
-        case '.py':
-            return 'python';
-        case '.md':
-            return 'markdown';
-        case '.json':
-            return 'json';
-        case '.html':
-            return 'html';
-        case '.css':
-            return 'css';
-        case '.jsonc':
-            return 'json';
-        default:
-            return undefined;
+        case '.tsx': return 'typescript';
+        case '.py': return 'python';
+        case '.md': return 'markdown';
+        case '.json': return 'json';
+        case '.html': return 'html';
+        case '.css': return 'css';
+        case '.jsonc': return 'json';
+        default: return undefined;
     }
 }

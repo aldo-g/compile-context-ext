@@ -1,27 +1,27 @@
-# Context Generator
+# Context Compilor
 
-Generate file tree and file contents for coding assistance with LLMs within VSCode.
+Compile file tree and file contents for coding assistance with LLMs within VSCode.
 
 ## Features
 
 - **Interactive File Tree:** Browse your project's file structure with checkboxes to include or exclude specific files and directories.
-- **Generate Context File:** Create a comprehensive context file (`file_context.txt`) based on your selections, useful for large language models (LLMs).
+- **Compile Context File:** Create a comprehensive context file (`file_context.txt`) based on your selections, useful for large language models (LLMs).
 - **Configuration Options:** Customize exclusions and output file name via VSCode settings.
 
 ## Usage
 
 1. **Open Your Project:**
-   - Open the folder you want to generate context for in VSCode.
+   - Open the folder you want to compile context for in VSCode.
 
-2. **Access Context Generator:**
-   - Navigate to the **"Context Generator"** view in the Explorer pane.
+2. **Access Context Compilor:**
+   - Navigate to the **"Context Compilor"** view in the Explorer pane.
 
 3. **Select Files and Directories:**
    - Use the checkboxes to include or exclude specific files and directories.
 
-4. **Generate Context:**
-   - Click the **"Generate Context"** button in the view's title bar.
-   - A `file_context.txt` will be generated in the workspace root, containing the file tree and file contents.
+4. **Compile Context:**
+   - Click the **"Compile Context"** button in the view's title bar.
+   - A `file_context.txt` will be compiled in the workspace root, containing the file tree and file contents.
 
 ## Configuration
 

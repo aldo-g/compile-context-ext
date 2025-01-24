@@ -2,14 +2,14 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { generateContext } from '../src/generateContext';
+import { compileContext } from '../src/compileContext';
 import { FileNode } from '../src/models/FileNode';
 import * as fs from 'fs';
 
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
 
-    test('Generate Context Function', () => {
+    test('Compile Context Function', () => {
         const workspaceRoot = path.resolve(__dirname, 'testWorkspace');
         const outputFile = 'test_context.txt';
 
@@ -34,7 +34,7 @@ suite('Extension Test Suite', () => {
         ];
 
         // Execute
-        generateContext(workspaceRoot, outputFile, selectedFiles, [], [], false);
+        compileContext(workspaceRoot, outputFile, selectedFiles, [], [], false);
 
         // Verify
         const outputPath = path.join(workspaceRoot, outputFile);

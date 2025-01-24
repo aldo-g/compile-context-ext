@@ -1,5 +1,5 @@
 /**
- * Provides data for the File Tree View in the VSCode extension.
+ * Provides data for the File Tree View in the Compile Context extension.
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -7,7 +7,7 @@ import { FileNode } from './models/FileNode';
 import * as fs from 'fs';
 
 /**
- * Provides the structure and data for the Tree View in the Context Generator extension.
+ * Provides the structure and data for the Tree View in the Compile Context extension.
  */
 export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
     private _onDidChangeTreeData: vscode.EventEmitter<FileNode | undefined | void> = new vscode.EventEmitter<FileNode | undefined | void>();
@@ -21,10 +21,18 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
     constructor(private workspaceRoot: string, private checkedFiles: Set<string>) {}
 
     /**
-     * Refreshes the Tree View by emitting a change event.
+     * Refreshes the entire Tree View.
      */
     refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    /**
+     * Refreshes a specific FileNode in the Tree View.
+     * @param node The FileNode to refresh.
+     */
+    refreshNode(node: FileNode): void {
+        this._onDidChangeTreeData.fire(node);
     }
 
     /**
@@ -37,10 +45,13 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
         const treeItem = new vscode.TreeItem(`${selectionSymbol} ${path.basename(element.label)}`, element.collapsibleState);
         treeItem.resourceUri = element.uri;
         treeItem.command = {
-            command: 'contextGenerator.toggleCheckbox',
+            command: 'compileContext.toggleCheckbox',
             title: '',
             arguments: [element]
         };
+
+        // Assign a stable unique ID based on the file path
+        treeItem.id = element.uri.fsPath;
 
         if (element.collapsibleState !== vscode.TreeItemCollapsibleState.None) {
             treeItem.iconPath = new vscode.ThemeIcon('folder');
@@ -87,7 +98,7 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
             return [];
         }
 
-        const config = vscode.workspace.getConfiguration('contextGenerator');
+        const config = vscode.workspace.getConfiguration('compileContext');
         const excludeHidden: boolean = config.get('excludeHidden') ?? true;
 
         const directories: string[] = [];
@@ -139,12 +150,14 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
                 checked = this.checkedFiles.has(fullPath);
             }
 
-            return {
+            const fileNode: FileNode = {
                 label: file + (isDirectory ? path.sep : ''),
                 collapsibleState: isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
                 uri: vscode.Uri.file(fullPath),
                 checked: checked
-            } as FileNode;
+            };
+
+            return fileNode;
         }).filter(node => node !== null) as FileNode[];
     }
 
@@ -156,23 +169,21 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
         const checkedFileNodes: FileNode[] = [];
 
         this.checkedFiles.forEach(filePath => {
-            checkedFileNodes.push({
-                label: path.basename(filePath),
-                collapsibleState: vscode.TreeItemCollapsibleState.None,
-                uri: vscode.Uri.file(filePath),
-                checked: true
-            } as FileNode);
+            try {
+                const stats = fs.statSync(filePath);
+                const isDir = stats.isDirectory();
+                checkedFileNodes.push({
+                    label: path.basename(filePath) + (isDir ? path.sep : ''),
+                    collapsibleState: isDir ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+                    uri: vscode.Uri.file(filePath),
+                    checked: true
+                } as FileNode);
+            } catch (err) {
+                console.error(`Error accessing file ${filePath}:`, err);
+            }
         });
 
         return checkedFileNodes;
-    }
-
-    /**
-     * Updates the set of checked files.
-     * @param paths An array of file paths to set as checked.
-     */
-    setCheckedFiles(paths: string[]) {
-        this.checkedFiles = new Set(paths);
     }
 
     /**
@@ -187,14 +198,41 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
             const someSelected = allChildFilePaths.some(filePath => this.checkedFiles.has(filePath));
 
             if (allSelected) {
-                return '●'; // Filled white circle
+                return '●';
             } else if (someSelected) {
-                return '◑'; // Half-filled circle
+                return '◑';
             } else {
-                return '○'; // Hollow circle
+                return '○';
             }
         } else {
             return element.checked ? '●' : '○';
+        }
+    }
+
+    /**
+     * Retrieves the parent FileNode of a given FileNode.
+     * @param element The FileNode whose parent is to be found.
+     * @returns The parent FileNode or undefined if at root.
+     */
+    getParent(element: FileNode): vscode.ProviderResult<FileNode> {
+        const parentPath = path.dirname(element.uri.fsPath);
+        if (parentPath === this.workspaceRoot) {
+            return undefined; // Root has no parent
+        }
+        try {
+            const stats = fs.statSync(parentPath);
+            if (stats.isDirectory()) {
+                return {
+                    label: path.basename(parentPath) + path.sep,
+                    collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                    uri: vscode.Uri.file(parentPath),
+                    checked: this.checkedFiles.has(parentPath)
+                } as FileNode;
+            }
+            return undefined;
+        } catch (err) {
+            console.error(`Error accessing parent directory ${parentPath}:`, err);
+            return undefined;
         }
     }
 }
@@ -218,7 +256,8 @@ function getAllChildFilesSync(dirPath: string): string[] {
             }
         });
     } catch (err) {
-        // Handle error silently; the caller handles inaccessible directories
+        console.error(`Error traversing directory ${dirPath}:`, err);
+        vscode.window.showErrorMessage(`Error traversing directory ${dirPath}: ${err}`);
     }
 
     return results;

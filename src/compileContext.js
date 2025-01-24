@@ -23,12 +23,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateContext = void 0;
-// src/generateContext.ts
+exports.compileContext = void 0;
+// src/compileContext.ts
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
-function generateContext(workspaceRoot, outputFile, selectedFiles, excludeFiles, excludePaths, excludeHidden) {
+function compileContext(workspaceRoot, outputFile, selectedFiles, excludeFiles, excludePaths, excludeHidden) {
     let fileTree = 'File Tree:\n';
     let filesContent = '\nFiles:\n';
     // Build file tree string
@@ -63,5 +63,5 @@ function generateContext(workspaceRoot, outputFile, selectedFiles, excludeFiles,
         vscode.window.showErrorMessage(`Failed to write to output file '${outputFile}': ${error}`);
     }
 }
-exports.generateContext = generateContext;
-//# sourceMappingURL=generateContext.js.map
+exports.compileContext = compileContext;
+//# sourceMappingURL=compileContext.js.map

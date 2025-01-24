@@ -1,13 +1,18 @@
+// src/extension.ts
 /**
- * Main activation file for the Context Generator VSCode extension.
+ * Main activation file for the Compile Context VSCode extension.
  */
 import * as vscode from 'vscode';
 import { FileTreeProvider } from './treeDataProvider';
 import { FileNode } from './models/FileNode';
-import { generateContext } from './generateContext';
+import { compileContext } from './compileContext';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
+/**
+ * Activates the Compile Context extension, setting up the Tree View and registering commands.
+ * @param context The extension context.
+ */
 export function activate(context: vscode.ExtensionContext) {
     const workspaceRoot = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
 
@@ -15,9 +20,32 @@ export function activate(context: vscode.ExtensionContext) {
     const checkedFiles = new Set<string>(persistedSelections);
 
     const treeDataProvider = new FileTreeProvider(workspaceRoot, checkedFiles);
-    vscode.window.registerTreeDataProvider('contextGeneratorView', treeDataProvider);
+    const treeView = vscode.window.createTreeView('compileContextView', { treeDataProvider: treeDataProvider });
 
-    vscode.commands.registerCommand('contextGenerator.toggleCheckbox', async (element: FileNode) => {
+    const expandedSet = new Set<string>();
+
+    treeView.onDidExpandElement(event => {
+        expandedSet.add(event.element.uri.fsPath);
+    });
+
+    treeView.onDidCollapseElement(event => {
+        expandedSet.delete(event.element.uri.fsPath);
+    });
+
+    /**
+     * Refreshes the entire Tree View while maintaining the expansion state.
+     */
+    const refreshTreeView = async () => {
+        treeDataProvider.refresh();
+    };
+
+    /**
+     * Toggles the checkbox state of a FileNode.
+     * @param element The FileNode to toggle.
+     */
+    vscode.commands.registerCommand('compileContext.toggleCheckbox', async (element: FileNode) => {
+        const affectedPaths = new Set<string>();
+
         if (isDirectory(element)) {
             const allChildFilePaths = await getAllChildFiles(element.uri.fsPath);
             const isChecked = allChildFilePaths.length > 0 && allChildFilePaths.every(filePath => checkedFiles.has(filePath));
@@ -26,38 +54,50 @@ export function activate(context: vscode.ExtensionContext) {
                 allChildFilePaths.forEach(filePath => {
                     checkedFiles.delete(filePath);
                     console.log(`Removed: ${filePath}`);
+                    affectedPaths.add(path.dirname(filePath));
                 });
             } else {
                 allChildFilePaths.forEach(filePath => {
                     checkedFiles.add(filePath);
                     console.log(`Added: ${filePath}`);
+                    affectedPaths.add(path.dirname(filePath));
                 });
             }
+
+            affectedPaths.add(element.uri.fsPath);
         } else {
             if (element.checked) {
                 checkedFiles.delete(element.uri.fsPath);
                 console.log(`Removed: ${element.uri.fsPath}`);
+                affectedPaths.add(path.dirname(element.uri.fsPath));
             } else {
                 checkedFiles.add(element.uri.fsPath);
                 console.log(`Added: ${element.uri.fsPath}`);
+                affectedPaths.add(path.dirname(element.uri.fsPath));
             }
+
+            affectedPaths.add(path.dirname(element.uri.fsPath));
         }
 
-        treeDataProvider.refresh();
+        // Instead of refreshing specific nodes, refresh the entire tree
+        await refreshTreeView();
 
         const allCheckedFiles = Array.from(checkedFiles);
         context.globalState.update('checkedFiles', allCheckedFiles);
     });
 
-    vscode.commands.registerCommand('contextGenerator.generateContext', () => {
+    /**
+     * Compiles the selected context into the output file.
+     */
+    vscode.commands.registerCommand('compileContext.compileContext', async () => {
         const selectedFiles = treeDataProvider.getAllCheckedFiles();
 
         if (selectedFiles.length === 0) {
-            vscode.window.showWarningMessage('No files selected. Please select at least one file to generate context.');
+            vscode.window.showWarningMessage('No files selected. Please select at least one file to compile context.');
             return;
         }
 
-        const config = vscode.workspace.getConfiguration('contextGenerator');
+        const config = vscode.workspace.getConfiguration('compileContext');
         const outputFile: string = config.get('outputFile') || 'file_context.txt';
         const excludeFiles: string[] = config.get('excludeFiles') || [];
         const excludePaths: string[] = config.get('excludePaths') || [];
@@ -87,10 +127,31 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        generateContext(workspaceRoot, outputFile, filteredFiles, excludeFiles, excludePaths, excludeHidden);
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Compiling Context...",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ increment: 0 });
+            try {
+                await compileContext(workspaceRoot, outputFile, filteredFiles, excludeFiles, excludePaths, excludeHidden);
+                progress.report({ increment: 100 });
+                vscode.window.showInformationMessage('Context compilation completed successfully!');
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    vscode.window.showErrorMessage(`Failed to compile context: ${error.message}`);
+                } else {
+                    vscode.window.showErrorMessage('Failed to compile context due to an unknown error.');
+                }
+                console.error(error);
+            }
+        });
     });
 
-    vscode.commands.registerCommand('contextGenerator.selectAll', async () => {
+    /**
+     * Selects all files in the workspace.
+     */
+    vscode.commands.registerCommand('compileContext.selectAll', async () => {
         const allFilePaths = await getAllFiles(workspaceRoot);
         allFilePaths.forEach(filePath => {
             if (!checkedFiles.has(filePath)) {
@@ -98,21 +159,29 @@ export function activate(context: vscode.ExtensionContext) {
                 console.log(`Added: ${filePath}`);
             }
         });
-        treeDataProvider.refresh();
+        await refreshTreeView();
         context.globalState.update('checkedFiles', Array.from(checkedFiles));
     });
 
-    vscode.commands.registerCommand('contextGenerator.deselectAll', () => {
+    /**
+     * Deselects all files in the workspace.
+     */
+    vscode.commands.registerCommand('compileContext.deselectAll', async () => {
         checkedFiles.forEach(filePath => {
             console.log(`Removed: ${filePath}`);
         });
         checkedFiles.clear();
-        treeDataProvider.refresh();
+        await refreshTreeView();
         context.globalState.update('checkedFiles', []);
     });
-}
 
-export function deactivate() {}
+    /**
+     * Adds a Compile Context button to the Tree View's title bar.
+     */
+    vscode.commands.registerCommand('compileContext.compileContextButton', async () => {
+        vscode.commands.executeCommand('compileContext.compileContext');
+    });
+}
 
 /**
  * Determines if a FileNode represents a directory.
@@ -143,7 +212,7 @@ async function getAllChildFiles(dirPath: string): Promise<string[]> {
             }
         }
     } catch (err) {
-        vscode.window.showErrorMessage(`Error reading directory ${dirPath}: ${err}`);
+        vscode.window.showErrorMessage(`Error reading directory ${dirPath}:`, String(err));
     }
 
     return results;

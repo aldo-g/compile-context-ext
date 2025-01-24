@@ -1,7 +1,7 @@
 {
-  "name": "context-gen-ext",
-  "displayName": "Context Generator",
-  "description": "Generate file tree for coding assistance with LLMs within VSCode.",
+  "name": "compile-context",
+  "displayName": "Compile Context",
+  "description": "Compiles context information for selected files within your workspace.",
   "version": "0.2.0",
   "publisher": "aldo-g",
   "engines": {
@@ -14,64 +14,69 @@
   "contributes": {
     "commands": [
       {
-        "command": "contextGenerator.toggleCheckbox",
+        "command": "compileContext.toggleCheckbox",
         "title": "Toggle Checkbox"
       },
       {
-        "command": "contextGenerator.generateContext",
-        "title": "Generate Context",
-        "category": "Context Generator"
+        "command": "compileContext.compileContext",
+        "title": "Compile Context",
+        "category": "Compile Context"
       },
       {
-        "command": "contextGenerator.selectAll",
+        "command": "compileContext.selectAll",
         "title": "Select All",
-        "category": "Context Generator"
+        "category": "Compile Context"
       },
       {
-        "command": "contextGenerator.deselectAll",
+        "command": "compileContext.deselectAll",
         "title": "Deselect All",
-        "category": "Context Generator"
+        "category": "Compile Context"
+      },
+      {
+        "command": "compileContext.compileContextButton",
+        "title": "Compile Context",
+        "category": "Compile Context"
       }
     ],
     "views": {
       "explorer": [
         {
-          "id": "contextGeneratorView",
-          "name": "Context Generator"
+          "id": "compileContextView",
+          "name": "Compile Context"
         }
       ]
     },
     "menus": {
       "view/title": [
         {
-          "command": "contextGenerator.generateContext",
-          "when": "view == contextGeneratorView",
+          "command": "compileContext.compileContextButton",
+          "when": "view == compileContextView",
           "group": "navigation"
         },
         {
-          "command": "contextGenerator.selectAll",
-          "when": "view == contextGeneratorView",
+          "command": "compileContext.selectAll",
+          "when": "view == compileContextView",
           "group": "navigation"
         },
         {
-          "command": "contextGenerator.deselectAll",
-          "when": "view == contextGeneratorView",
+          "command": "compileContext.deselectAll",
+          "when": "view == compileContextView",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "contextGenerator.toggleCheckbox",
-          "when": "view == contextGeneratorView",
+          "command": "compileContext.toggleCheckbox",
+          "when": "view == compileContextView",
           "group": "navigation"
         }
       ]
     },
     "configuration": {
       "type": "object",
-      "title": "Context Generator Configuration",
+      "title": "Compile Context Configuration",
       "properties": {
-        "contextGenerator.excludeFiles": {
+        "compileContext.excludeFiles": {
           "type": "array",
           "items": {
             "type": "string"
@@ -79,7 +84,7 @@
           "default": [".env", "package-lock.json", "LICENSE"],
           "description": "List of filenames to exclude."
         },
-        "contextGenerator.excludePaths": {
+        "compileContext.excludePaths": {
           "type": "array",
           "items": {
             "type": "string"
@@ -87,12 +92,12 @@
           "default": [".git", "__pycache__", "build"],
           "description": "List of directory paths to exclude."
         },
-        "contextGenerator.outputFile": {
+        "compileContext.outputFile": {
           "type": "string",
           "default": "file_context.txt",
-          "description": "Output file for the generated context."
+          "description": "Output file for the compiled context."
         },
-        "contextGenerator.excludeHidden": {
+        "compileContext.excludeHidden": {
           "type": "boolean",
           "default": true,
           "description": "Exclude hidden files and directories."
